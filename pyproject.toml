@@ -12,6 +12,14 @@ dependencies = [
     "alembic>=1.13",
     "pydantic[email]>=2.7",
     "asyncpg>=0.29",        # PostgreSQL async driver (production)
+    "httpx>=0.27",          # async HTTP client used by all scanners
+    "anthropic>=0.40",      # Claude API client — used ONLY by ai/engine.py
+    "celery>=5.3",          # async scan job queue (CLAUDE.md §2.1)
+    "redis>=5.0",           # Celery broker/backend + scan state & tenant locks
+    "fastapi>=0.111",       # async API surface (CLAUDE.md §8)
+    "uvicorn[standard]>=0.30",  # ASGI server for the API
+    "pyjwt>=2.8",           # JWT access/refresh tokens (CLAUDE.md §8)
+    "bcrypt>=4.1",          # password hashing
 ]
 
 [project.optional-dependencies]
@@ -19,6 +27,12 @@ test = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
     "aiosqlite>=0.20",      # in-memory SQLite for tests
+]
+# Dev-only preview dashboard (tools/dashboard.py). NOT the production API:
+# the real scan API is async via Celery (CLAUDE.md §2.1) and arrives later.
+dashboard = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VulnScan AI — Önizleme</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#131a26; --panel2:#0f1622; --border:#1f2a3a;
+    --text:#e6edf6; --muted:#8aa0bd; --accent:#4f8cff;
+    --crit:#ff5c5c; --warn:#ffb020; --ok:#33c481; --info:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  header .logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#7b5cff);display:grid;place-items:center;font-weight:800}
+  header h1{font-size:18px;margin:0}
+  header .tag{font-size:12px;color:var(--muted);border:1px solid var(--border);padding:2px 8px;border-radius:999px;margin-left:auto}
+  main{max-width:1060px;margin:0 auto;padding:24px 20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:18px}
+  .card h2{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+  form{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:10px;padding:11px 12px;font:inherit}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  textarea{resize:vertical;min-height:44px}
+  button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 22px;font-weight:600;cursor:pointer;white-space:nowrap}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .stat .n{font-size:24px;font-weight:700}
+  .stat .l{font-size:12px;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel2)}
+  .badge{display:inline-block;font-size:12px;padding:3px 9px;border-radius:7px;margin:3px 6px 3px 0}
+  .b-crit{background:rgba(255,92,92,.14);color:var(--crit);border:1px solid rgba(255,92,92,.4)}
+  .b-warn{background:rgba(255,176,32,.14);color:var(--warn);border:1px solid rgba(255,176,32,.4)}
+  .b-ok{background:rgba(51,196,129,.14);color:var(--ok);border:1px solid rgba(51,196,129,.4)}
+  .b-info{background:rgba(90,169,255,.14);color:var(--info);border:1px solid rgba(90,169,255,.4)}
+  .row{padding:9px 0;border-top:1px solid var(--border);font-size:14px}
+  .row:first-child{border-top:0}
+  .row .note{color:var(--muted);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-top:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  code{background:var(--panel2);padding:2px 6px;border-radius:6px;font-size:12px}
+  .muted{color:var(--muted)}
+  .err{background:rgba(255,92,92,.1);border:1px solid rgba(255,92,92,.4);color:#ffd0d0;padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:12px}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px}
+  pre{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;overflow:auto;font-size:12px;max-height:420px}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media(max-width:760px){form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">V</div>
+  <h1>VulnScan AI</h1>
+  <span class="tag">dev preview · pasif tarama</span>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Hedef Tara</h2>
+    <form id="scanForm">
+      <div>
+        <label for="target">Hedef URL</label>
+        <input id="target" placeholder="https://example.com" value="https://example.com" autocomplete="off">
+      </div>
+      <div>
+        <label for="scope">Scope (virgülle; boşsa hedef host'u)</label>
+        <textarea id="scope" placeholder="example.com, *.example.com"></textarea>
+      </div>
+      <button id="go" type="submit">Tara</button>
+    </form>
+    <div class="hint">⚠️ Yalnızca yetkili olduğun hedefleri tara. Scope dışı URL'ler istek gönderilmeden reddedilir (CLAUDE.md §7.2). Bu panel pasif okur — payload göndermez.</div>
+  </div>
+
+  <div id="results"></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (t, c, h) => { const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e; };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+$("#scanForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = $("#go"), out = $("#results");
+  const target = $("#target").value.trim();
+  if(!target){ return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Taranıyor';
+  out.innerHTML = "";
+  try{
+    const res = await fetch("/api/scan", {
+      method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ target, scope: $("#scope").value })
+    });
+    if(!res.ok){ throw new Error("HTTP "+res.status); }
+    render(await res.json());
+  }catch(e){
+    out.appendChild(el("div","err","Tarama başarısız: "+esc(e.message)));
+  }finally{
+    btn.disabled = false; btn.textContent = "Tara";
+  }
+});
+
+function render(d){
+  const out = $("#results"); out.innerHTML = "";
+  const recon = d.recon, headers = d.headers, js = d.js;
+
+  // --- error banners ---
+  [["Recon",recon],["Header",headers],["JS",js]].forEach(([name,r])=>{
+    if(r.error){ out.appendChild(el("div","err",`${name} taraması hata verdi: ${esc(r.error_message)}`)); }
+  });
+
+  // --- summary ---
+  const rd = recon.data || {};
+  const sum = el("div","card");
+  sum.appendChild(el("h2",null,"Özet — "+esc(d.target)));
+  const links = rd.links || {internal:[],external:[]};
+  const grid = el("div","grid");
+  const stats = [
+    ["Durum", rd.status_code ?? "—"],
+    ["İç link", (links.internal||[]).length],
+    ["Dış link", (links.external||[]).length],
+    ["Form", (rd.forms||[]).length],
+    ["Script", (rd.scripts||[]).length],
+    ["JS secret", (js.data?.matches||[]).length],
+  ];
+  stats.forEach(([l,n])=>{ const s=el("div","stat"); s.appendChild(el("div","n",esc(n))); s.appendChild(el("div","l",esc(l))); grid.appendChild(s); });
+  sum.appendChild(grid);
+  if(rd.title){ sum.appendChild(el("div","hint","Başlık: "+esc(rd.title)+"  ·  Scope: "+(d.scope||[]).map(esc).join(", "))); }
+  const tech = rd.tech_stack||[];
+  if(tech.length){ const c=el("div","chips"); c.style.marginTop="12px"; tech.forEach(t=>c.appendChild(el("span","chip",esc(t)))); sum.appendChild(c); }
+  out.appendChild(sum);
+
+  // --- security headers ---
+  const hd = headers.data || {};
+  const hc = el("div","card"); hc.appendChild(el("h2",null,"Güvenlik Header'ları"));
+  const sec = (title,arr,cls,withNote)=>{
+    if(!arr || !arr.length) return;
+    const wrap=el("div"); wrap.style.marginBottom="10px";
+    wrap.appendChild(el("div","muted",esc(title)+" ("+arr.length+")"));
+    const box=el("div"); box.style.marginTop="6px";
+    arr.forEach(x=>{
+      const label = x.header + (x.value? " = "+x.value : "");
+      box.appendChild(el("span","badge "+cls, esc(label)));
+    });
+    wrap.appendChild(box);
+    hc.appendChild(wrap);
+  };
+  sec("Eksik", hd.missing, "b-crit");
+  sec("Zayıf", hd.weak, "b-warn");
+  sec("Mevcut", hd.present, "b-ok");
+  sec("Bilgi sızıntısı", (hd.information_disclosure||[]).map(x=>({header:x.header,value:x.value})), "b-info");
+  if(!hd.missing){ hc.appendChild(el("div","muted","Veri yok.")); }
+  out.appendChild(hc);
+
+  // --- JS secrets ---
+  const jm = js.data?.matches || [];
+  const jc = el("div","card"); jc.appendChild(el("h2",null,"JS Secret Taraması"));
+  if(jm.length){
+    const t=el("table"); t.innerHTML="<tr><th>Patern</th><th>Dosya</th><th>Satır</th><th>Önizleme (redakte)</th></tr>";
+    jm.forEach(m=>{
+      const tr=el("tr");
+      tr.innerHTML=`<td><span class="badge b-crit">${esc(m.pattern)}</span></td>
+        <td class="muted">${esc(m.url)}</td><td>${esc(m.line)}</td><td><code>${esc(m.redacted)}</code></td>`;
+      t.appendChild(tr);
+    });
+    jc.appendChild(t);
+  }else{
+    jc.appendChild(el("div","muted",
+      (js.data?.scripts_scanned?.length? js.data.scripts_scanned.length+" script tarandı, secret bulunamadı." : "Taranacak harici JS bulunamadı.")));
+  }
+  out.appendChild(jc);
+
+  // --- raw json ---
+  const raw = el("div","card");
+  const det = el("details"); det.appendChild(el("summary",null,"Ham JSON yanıtı"));
+  det.appendChild(el("pre",null,esc(JSON.stringify(d,null,2))));
+  raw.appendChild(det); out.appendChild(raw);
+}
+</script>
+</body>
+</html>

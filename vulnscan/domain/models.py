@@ -321,6 +321,33 @@ class BountySubmission(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, B
     finding: Mapped["ScanFinding"] = relationship(back_populates="submissions")
 
 
+class AuditLog(UUIDPrimaryKeyMixin, TenantScopedMixin, Base):
+    """Append-only audit record (CLAUDE.md §7.5).
+
+    Captures who (``user_id`` / ``tenant_id``), what (``action`` + ``target``),
+    when (``created_at``), and what was found (``detail`` JSON). Deliberately
+    has NO ``updated_at`` / ``deleted_at`` and no mutators — audit rows are
+    written once and never changed or deleted.
+    """
+
+    __tablename__ = "audit_logs"
+
+    # Nullable so system-originated events (no acting user) can still be logged.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    target: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Arbitrary structured context (scan id, severity counts, decision, …).
+    detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 __all__ = [
     "Base",
     "Tenant",
@@ -329,4 +356,5 @@ __all__ = [
     "ScanJob",
     "ScanFinding",
     "BountySubmission",
+    "AuditLog",
 ]

@@ -1,0 +1,51 @@
+# ---- Secrets / env (NEVER commit — security platform) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+credentials.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+celerybeat-schedule*
+
+# ---- Playwright ----
+playwright-report/
+test-results/
+.cache/ms-playwright/
+
+# ---- Node / Next.js (frontend/) ----
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Databases / local data ----
+*.sqlite3
+*.db
+dump.rdb
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

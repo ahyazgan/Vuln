@@ -21,6 +21,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from vulnscan.domain.enums import (
+    PaymentStatus,
     PlanType,
     ScanStatus,
     Severity,
@@ -195,6 +196,41 @@ class BountySubmissionRead(TimestampedRead):
     reviewed_at: datetime | None = None
 
 
+# --------------------------------------------------------------------------- #
+# Payment
+# --------------------------------------------------------------------------- #
+class PaymentCreate(BaseModel):
+    """Initiate a reward payment for an accepted submission.
+
+    The amount defaults to the submission's reviewed ``reward_amount``; a company
+    may override it (e.g. a partial payout) but never below zero.
+    """
+
+    amount: Decimal | None = Field(default=None, ge=0)
+    currency: str = Field(default="usd", min_length=3, max_length=3)
+
+
+class PaymentRead(TimestampedRead):
+    tenant_id: uuid.UUID
+    submission_id: uuid.UUID
+    amount: Decimal
+    currency: str
+    status: PaymentStatus
+    provider: str
+    provider_payment_id: str | None = None
+    error_message: str | None = None
+
+
+class PaymentInitiated(PaymentRead):
+    """Payment response that also carries the provider client secret.
+
+    ``client_secret`` is returned only on creation so a frontend can confirm the
+    payment with Stripe.js. It is never persisted (§7.3) and never read back.
+    """
+
+    client_secret: str | None = None
+
+
 __all__ = [
     "TimestampedRead",
     "TenantBase",
@@ -218,4 +254,7 @@ __all__ = [
     "BountySubmissionCreate",
     "BountySubmissionReview",
     "BountySubmissionRead",
+    "PaymentCreate",
+    "PaymentRead",
+    "PaymentInitiated",
 ]

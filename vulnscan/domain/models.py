@@ -43,6 +43,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from vulnscan.domain.enums import (
+    PaymentStatus,
     PlanType,
     ScanStatus,
     Severity,
@@ -305,6 +306,44 @@ class BountySubmission(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, B
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     finding: Mapped["ScanFinding"] = relationship(back_populates="submissions")
+    payments: Mapped[list["Payment"]] = relationship(
+        back_populates="submission", cascade="all, delete-orphan"
+    )
+
+
+class Payment(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
+    """A bounty reward payment for an accepted submission (Stripe-backed).
+
+    ``tenant_id`` is the *paying company's* tenant (the one that owns the program
+    and reviews submissions), so every read filters by it (§2.6). Only payment
+    *metadata* is persisted — amount, currency, status, and the Stripe object id;
+    never card data, tokens, or any secret (§7.3 / §2.5). The Stripe API key
+    lives in the environment and is read by the gateway, never stored here.
+    """
+
+    __tablename__ = "payments"
+    __table_args__ = (CheckConstraint("amount >= 0", name="ck_payments_amount_non_negative"),)
+
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("bounty_submissions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="usd")
+    status: Mapped[PaymentStatus] = mapped_column(
+        _enum(PaymentStatus, "payment_status"),
+        nullable=False,
+        default=PaymentStatus.PENDING,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="stripe")
+    # The Stripe PaymentIntent id (e.g. "pi_..."). Indexed for webhook lookup.
+    provider_payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    submission: Mapped["BountySubmission"] = relationship(back_populates="payments")
 
 
 class AuditLog(UUIDPrimaryKeyMixin, TenantScopedMixin, Base):
@@ -342,5 +381,6 @@ __all__ = [
     "ScanJob",
     "ScanFinding",
     "BountySubmission",
+    "Payment",
     "AuditLog",
 ]

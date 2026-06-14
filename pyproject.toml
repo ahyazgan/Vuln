@@ -20,6 +20,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",  # ASGI server for the API
     "pyjwt>=2.8",           # JWT access/refresh tokens (CLAUDE.md §8)
     "bcrypt>=4.1",          # password hashing
+    "stripe>=10.0",         # bounty reward payments (CLAUDE.md §8) — lazily imported
 ]
 
 [project.optional-dependencies]

@@ -62,3 +62,42 @@ cd vulnscan/frontend && npm install && npm run dev   # frontend
 
 CI (`.github/workflows/ci.yml`) runs the backend lint+tests and the frontend
 lint+build on every push.
+
+### Running the stack locally
+
+```bash
+# 1. Postgres + Redis (any local install or container), then migrate the schema:
+export DATABASE_URL=postgresql+asyncpg://vulnscan:vulnscan@127.0.0.1:5432/vulnscan
+alembic upgrade head
+
+# 2. API (returns immediately on POST /scans; the scan runs in the worker):
+uvicorn vulnscan.main:app --reload
+
+# 3. Worker (use --pool=solo locally; each task runs in its own event loop):
+celery -A vulnscan.workers.app:celery_app worker --pool=solo -l info
+```
+
+Config is read from the environment — see `.env.example` for every variable
+(database, Redis/Celery, JWT, webhook, Anthropic, Stripe).
+
+### Live verification
+
+Two manual harnesses exercise the real wiring (beyond the unit suite):
+
+| Script | What it proves |
+|--------|----------------|
+| `scripts/smoke_live.py`     | API/auth/scope/audit over the production app (SQLite, no services needed). |
+| `scripts/live_pipeline.py`  | The **full level-6 pipeline** against real Postgres + Redis: scanners → AI chains (fake Claude client, no key needed) → findings + chained findings persisted, six steps in Redis. |
+
+```bash
+# live_pipeline.py needs Postgres + Redis up and an in-scope HTTP target:
+python -m http.server 8099 --bind 127.0.0.1 &      # a throwaway in-scope target
+DATABASE_URL=postgresql+asyncpg://vulnscan:vulnscan@127.0.0.1:5432/vulnscan \
+REDIS_URL=redis://localhost:6379/0 TARGET_URL=http://127.0.0.1:8099/ \
+PYTHONPATH=. python scripts/live_pipeline.py
+```
+
+> **Worker note:** every Celery task runs in a fresh event loop (`asyncio.run`),
+> so the worker uses a dedicated `NullPool` engine and a single-loop
+> acquire→run→release lock cycle — pooled DB/Redis clients must never be reused
+> across loops.

@@ -104,3 +104,20 @@ export interface Payment {
 export interface PaymentInitiated extends Payment {
   client_secret: string | null;
 }
+
+export interface ReportSummary {
+  scan_id: string;
+  target_url: string;
+  status: ScanStatus;
+  generated_at: string;
+  total_findings: number;
+  by_severity: Record<string, number>;
+  max_severity: Severity | null;
+  risk_score: number;
+}
+
+export interface ScanReport {
+  summary: ReportSummary;
+  findings: ScanFinding[];
+  chained_findings: ScanFinding[];
+}

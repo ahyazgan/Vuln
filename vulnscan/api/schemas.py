@@ -65,6 +65,37 @@ class ScanCreatedResponse(BaseModel):
     status: ScanStatus
 
 
+# --------------------------------------------------------------------------- #
+# Reports (CLAUDE.md §4.6)
+# --------------------------------------------------------------------------- #
+from datetime import datetime  # noqa: E402
+
+from vulnscan.domain.enums import Severity  # noqa: E402
+from vulnscan.domain.schemas import ScanFindingRead  # noqa: E402
+
+
+class ReportSummary(BaseModel):
+    """The executive section: at-a-glance posture for a scan."""
+
+    scan_id: uuid.UUID
+    target_url: str
+    status: ScanStatus
+    generated_at: datetime
+    total_findings: int
+    by_severity: dict[str, int]
+    max_severity: Severity | None = None
+    # 0–100 weighted risk score derived from the finding severities.
+    risk_score: int
+
+
+class ScanReport(BaseModel):
+    """Executive summary + technical detail (individual + chained findings)."""
+
+    summary: ReportSummary
+    findings: list[ScanFindingRead]
+    chained_findings: list[ScanFindingRead]
+
+
 __all__ = [
     "RegisterRequest",
     "LoginRequest",
@@ -73,4 +104,6 @@ __all__ = [
     "AccessToken",
     "ScanCreateRequest",
     "ScanCreatedResponse",
+    "ReportSummary",
+    "ScanReport",
 ]

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Shell } from "@/components/shell";
@@ -123,9 +124,14 @@ export default function ScanDetailPage() {
     <Shell>
       <div className="page-head">
         <h1 style={{ margin: 0 }}>Scan detail</h1>
-        <button className="btn secondary small" onClick={reload}>
-          Refresh
-        </button>
+        <div className="row">
+          <Link className="btn secondary small" href={`/scans/${id}/report`}>
+            View report
+          </Link>
+          <button className="btn secondary small" onClick={reload}>
+            Refresh
+          </button>
+        </div>
       </div>
       <ErrorAlert message={scanErr} />
 

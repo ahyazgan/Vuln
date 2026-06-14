@@ -13,16 +13,20 @@ import type {
   ScanCreated,
   ScanFinding,
   ScanJob,
+  ScanReport,
   SubmissionStatus,
   TokenPair,
   User,
   UserRole,
 } from "./types";
 
-const API_BASE =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
-const PREFIX = "/api/v1";
+export const API_PREFIX = "/api/v1";
+
+const API_BASE = API_BASE_URL;
+const PREFIX = API_PREFIX;
 
 export class ApiError extends Error {
   status: number;
@@ -110,6 +114,9 @@ export const api = {
     body: { target_url: string; program_id: string; scan_level: number },
   ) => request<ScanCreated>("/scans", { method: "POST", body, token }),
 
+  getScanReport: (token: string, id: string) =>
+    request<ScanReport>(`/scans/${id}/report`, { token }),
+
   // --- Submissions -----------------------------------------------------------
   listSubmissions: (token: string) => request<BountySubmission[]>("/submissions", { token }),
 
@@ -136,3 +143,28 @@ export const api = {
       token,
     }),
 };
+
+/**
+ * Download a report export (md/html). Token-auth means we can't use a plain
+ * <a href> — fetch the file with the bearer header, then save the blob.
+ */
+export async function downloadReport(
+  token: string,
+  scanId: string,
+  format: "md" | "html",
+): Promise<void> {
+  const res = await fetch(`${API_BASE}${PREFIX}/scans/${scanId}/report.${format}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new ApiError(res.status, `Failed to download report (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `report-${scanId}.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

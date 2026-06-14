@@ -1,12 +1,16 @@
 """FastAPI application factory (CLAUDE.md §3 / §8).
 
 ``create_app`` assembles the routers into an app. The top-level ``main.py``
-entrypoint (next step) imports this and adds lifespan/startup wiring; keeping the
-factory here lets tests build a fresh app and override dependencies (DB session,
-scan enqueuer) without a running database or broker.
+entrypoint imports this and supplies lifespan/startup wiring; keeping the factory
+here lets tests build a fresh app and override dependencies (DB session, scan
+enqueuer) without a running database or broker. ``main.py`` passes a ``lifespan``
+that disposes the DB engine on shutdown; tests call ``create_app()`` with none.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 
 from fastapi import FastAPI
 
@@ -19,12 +23,17 @@ from vulnscan.api.routes.webhooks import router as webhooks_router
 
 API_PREFIX = "/api/v1"
 
+# A FastAPI lifespan: a callable taking the app and returning an async context
+# manager. Optional so tests can build an app with no startup/shutdown wiring.
+Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
-def create_app() -> FastAPI:
+
+def create_app(*, lifespan: Lifespan | None = None) -> FastAPI:
     app = FastAPI(
         title="VulnScan AI",
         version="0.1.0",
         summary="Authorized, AI-assisted vulnerability scanning platform.",
+        lifespan=lifespan,
     )
 
     @app.get("/health", tags=["meta"])

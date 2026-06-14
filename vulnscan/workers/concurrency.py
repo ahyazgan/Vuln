@@ -41,6 +41,9 @@ class InMemoryConcurrencyGuard:
     async def current(self, tenant_id: str) -> str | None:
         return self._held.get(tenant_id)
 
+    async def aclose(self) -> None:
+        """No-op; present so both guards share one interface."""
+
 
 class RedisConcurrencyGuard:
     """Redis ``SET NX EX`` tenant lock — safe across many workers/hosts."""
@@ -75,6 +78,13 @@ class RedisConcurrencyGuard:
 
     async def current(self, tenant_id: str) -> str | None:
         return await self._client().get(self._key(tenant_id))
+
+    async def aclose(self) -> None:
+        """Close the redis client. Call before the owning event loop ends so the
+        client isn't left bound to a closed loop (it is created per task run)."""
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
 
 
 __all__ = [

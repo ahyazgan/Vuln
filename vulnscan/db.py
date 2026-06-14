@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from vulnscan.domain.models import Base
 
@@ -38,6 +39,16 @@ engine = create_async_engine(
 # them from a route after the transaction closes).
 SessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+)
+
+# Celery workers run *each* task in a fresh event loop (``asyncio.run`` per task).
+# A pooled asyncpg connection is bound to the loop that opened it, so reusing one
+# across tasks raises "got Future attached to a different loop". The worker
+# therefore uses a NullPool engine: every session opens — and closes — its own
+# connection within the current loop, pooling nothing across loops.
+worker_engine = create_async_engine(DATABASE_URL, echo=_ECHO, poolclass=NullPool, future=True)
+WorkerSessionLocal = async_sessionmaker(
+    worker_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
 )
 
 
@@ -73,6 +84,8 @@ __all__ = [
     "DATABASE_URL",
     "engine",
     "SessionLocal",
+    "worker_engine",
+    "WorkerSessionLocal",
     "get_db",
     "init_models",
     "dispose_engine",

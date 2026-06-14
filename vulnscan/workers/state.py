@@ -37,6 +37,9 @@ class InMemoryScanStateStore:
     async def all(self, scan_id: str) -> dict[str, Any]:
         return dict(self._data.get(scan_id, {}))
 
+    async def aclose(self) -> None:
+        """No-op; present so both stores share one interface."""
+
 
 class RedisScanStateStore:
     """Redis-backed scan state: one hash ``scan:{scan_id}`` of step -> JSON."""
@@ -70,6 +73,12 @@ class RedisScanStateStore:
     async def all(self, scan_id: str) -> dict[str, Any]:
         raw = await self._client().hgetall(self._key(scan_id))
         return {k: json.loads(v) for k, v in raw.items()}
+
+    async def aclose(self) -> None:
+        """Close the redis client before the owning event loop ends."""
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
 
 
 __all__ = [

@@ -131,6 +131,25 @@ async def test_update_plan_and_suspend_tenant(api):
     assert {"admin.tenant_updated", "admin.tenant_suspended"} <= actions
 
 
+async def test_suspended_tenant_users_cannot_authenticate(api):
+    client, _, maker = api
+    admin = await _admin_token(client, maker)
+    company = await _register(client, "c@co.com", "company", "AcmeCorp")
+    company_me = (await client.get(f"{P}/auth/me", headers=_auth(company))).json()
+
+    # Before suspension the company can use its token.
+    assert (await client.get(f"{P}/auth/me", headers=_auth(company))).status_code == 200
+
+    await client.delete(f"{P}/admin/tenants/{company_me['tenant_id']}", headers=_auth(admin))
+
+    # After suspension the token is rejected and a fresh login fails too.
+    assert (await client.get(f"{P}/auth/me", headers=_auth(company))).status_code == 401
+    relogin = await client.post(
+        f"{P}/auth/login", json={"email": "c@co.com", "password": "password123"}
+    )
+    assert relogin.status_code == 401
+
+
 async def test_update_unknown_tenant_404(api):
     client, _, maker = api
     admin = await _admin_token(client, maker)

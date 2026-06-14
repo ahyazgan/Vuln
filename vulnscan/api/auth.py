@@ -93,7 +93,16 @@ def require_roles(*roles: UserRole):
 
 
 async def _load_live_user(session: AsyncSession, user_id: uuid.UUID) -> User | None:
-    stmt = select(User).where(User.id == user_id).where(User.deleted_at.is_(None))
+    # Reject users whose account OR whose tenant has been (soft-)deleted, so an
+    # admin suspending a tenant (sets Tenant.deleted_at) immediately blocks all
+    # of its users from authenticating or refreshing (CLAUDE.md §1 abuse control).
+    stmt = (
+        select(User)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .where(User.id == user_id)
+        .where(User.deleted_at.is_(None))
+        .where(Tenant.deleted_at.is_(None))
+    )
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
@@ -125,7 +134,14 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_db
 
 @router.post("/login", response_model=TokenPair)
 async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> TokenPair:
-    stmt = select(User).where(User.email == str(body.email)).where(User.deleted_at.is_(None))
+    # Join Tenant so a suspended (soft-deleted) tenant's users can't log in (§1).
+    stmt = (
+        select(User)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .where(User.email == str(body.email))
+        .where(User.deleted_at.is_(None))
+        .where(Tenant.deleted_at.is_(None))
+    )
     if body.tenant_id is not None:
         stmt = stmt.where(User.tenant_id == body.tenant_id)
     matches = list((await session.execute(stmt)).scalars().all())

@@ -44,5 +44,21 @@ constraints.
 
 ## Status
 
-🚧 Early development. The domain layer, scanners, AI engine, worker pipeline,
-and API are being implemented per the roadmap in `CLAUDE.md`.
+The backend is feature-complete and tested: domain layer, scanners, AI engine,
+the six-step Celery worker pipeline, the HTTP API (auth, programs, scans,
+submissions, append-only audit log), and Stripe-backed bounty **payments**. A
+Next.js 14 **frontend** (`vulnscan/frontend/`) covers auth, scans, programs,
+submissions, and payments.
+
+### Developing
+
+```bash
+pip install -e ".[dev]"   # runtime + test + lint tooling
+pytest -q                 # backend tests
+ruff check . && ruff format --check .
+
+cd vulnscan/frontend && npm install && npm run dev   # frontend
+```
+
+CI (`.github/workflows/ci.yml`) runs the backend lint+tests and the frontend
+lint+build on every push.

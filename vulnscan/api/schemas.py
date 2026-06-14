@@ -8,10 +8,12 @@ surface.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from vulnscan.domain.enums import ScanStatus, UserRole
+from vulnscan.domain.enums import PlanType, ScanStatus, Severity, UserRole
+from vulnscan.domain.schemas import ScanFindingRead
 
 
 # --------------------------------------------------------------------------- #
@@ -65,6 +67,79 @@ class ScanCreatedResponse(BaseModel):
     status: ScanStatus
 
 
+# --------------------------------------------------------------------------- #
+# Reports (CLAUDE.md §4.6)
+# --------------------------------------------------------------------------- #
+class ReportSummary(BaseModel):
+    """The executive section: at-a-glance posture for a scan."""
+
+    scan_id: uuid.UUID
+    target_url: str
+    status: ScanStatus
+    generated_at: datetime
+    total_findings: int
+    by_severity: dict[str, int]
+    max_severity: Severity | None = None
+    # 0–100 weighted risk score derived from the finding severities.
+    risk_score: int
+
+
+class ScanReport(BaseModel):
+    """Executive summary + technical detail (individual + chained findings)."""
+
+    summary: ReportSummary
+    findings: list[ScanFindingRead]
+    chained_findings: list[ScanFindingRead]
+
+
+# --------------------------------------------------------------------------- #
+# Admin (CLAUDE.md §1 — platform management; the sanctioned §2.6 exception)
+# --------------------------------------------------------------------------- #
+class AdminStats(BaseModel):
+    """Whole-platform row counts for the admin dashboard."""
+
+    tenants: int
+    users: int
+    programs: int
+    scans: int
+    findings: int
+    submissions: int
+    payments: int
+
+
+class TenantAdminRead(BaseModel):
+    """A tenant as the admin sees it: identity, plan, status, and usage counts."""
+
+    id: uuid.UUID
+    name: str
+    plan: PlanType
+    created_at: datetime
+    deleted_at: datetime | None = None
+    user_count: int
+    scan_count: int
+
+
+class TenantPlanUpdate(BaseModel):
+    """Admin edit of a tenant's plan and/or name (§1 plan management)."""
+
+    plan: PlanType | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class AuditLogRead(BaseModel):
+    """An append-only audit record (§7.5), surfaced for abuse monitoring."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    user_id: uuid.UUID | None = None
+    action: str
+    target: str | None = None
+    detail: dict
+    created_at: datetime
+
+
 __all__ = [
     "RegisterRequest",
     "LoginRequest",
@@ -73,4 +148,10 @@ __all__ = [
     "AccessToken",
     "ScanCreateRequest",
     "ScanCreatedResponse",
+    "ReportSummary",
+    "ScanReport",
+    "AdminStats",
+    "TenantAdminRead",
+    "TenantPlanUpdate",
+    "AuditLogRead",
 ]

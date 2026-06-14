@@ -63,6 +63,20 @@ class SubmissionStatus(str, enum.Enum):
     PAID = "paid"
 
 
+class PaymentStatus(str, enum.Enum):
+    """Lifecycle of a bounty reward payment (Stripe-backed).
+
+    A payment starts ``pending`` when the company initiates it; the Stripe
+    webhook flips it to ``succeeded`` or ``failed``. ``refunded`` covers a
+    reversed payout.
+    """
+
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+
 _SEVERITY_RANK: dict[Severity, int] = {
     Severity.INFO: 0,
     Severity.LOW: 1,
@@ -78,4 +92,5 @@ __all__ = [
     "Severity",
     "ScanStatus",
     "SubmissionStatus",
+    "PaymentStatus",
 ]

@@ -22,7 +22,7 @@ import os
 from celery import Celery
 
 from vulnscan.ai.engine import AnalysisEngine
-from vulnscan.db import SessionLocal
+from vulnscan.db import WorkerSessionLocal
 from vulnscan.workers.concurrency import RedisConcurrencyGuard
 from vulnscan.workers.persistence import persist_scan_result
 from vulnscan.workers.pipeline import ScannerFactory, ScanPipeline, ScanRequest
@@ -37,7 +37,7 @@ SCAN_REQUEUE_DELAY = int(os.getenv("VULNSCAN_SCAN_RETRY_SECONDS", "30"))
 
 celery_app = Celery("vulnscan", broker=BROKER_URL, backend=RESULT_BACKEND)
 celery_app.conf.update(
-    task_acks_late=True,           # re-deliver if a worker dies mid-scan
+    task_acks_late=True,  # re-deliver if a worker dies mid-scan
     worker_prefetch_multiplier=1,  # one long scan at a time per worker process
     task_track_started=True,
     task_serializer="json",
@@ -57,10 +57,32 @@ async def _run_and_persist(request: ScanRequest) -> dict:
         )
     finally:
         await factory.aclose()
+        await state.aclose()
 
-    async with SessionLocal() as session:
+    async with WorkerSessionLocal() as session:
         summary = await persist_scan_result(session, request, result)
     return {**summary, "report": result.report}
+
+
+async def _acquire_run_release(request: ScanRequest) -> dict | None:
+    """Acquire the tenant lock, run+persist, then release — all in one loop.
+
+    Returns the result summary, or ``None`` if the tenant already has a running
+    scan (the caller re-queues). Keeping the whole lifecycle inside a single
+    event loop is required: ``redis.asyncio`` clients (and asyncpg connections)
+    are bound to the loop that created them, so a separate ``asyncio.run`` for
+    acquire/release would reuse a client tied to an already-closed loop.
+    """
+    guard = RedisConcurrencyGuard()
+    try:
+        if not await guard.acquire(request.tenant_id, request.scan_id):
+            return None
+        try:
+            return await _run_and_persist(request)
+        finally:
+            await guard.release(request.tenant_id, request.scan_id)
+    finally:
+        await guard.aclose()
 
 
 @celery_app.task(bind=True, name="vulnscan.run_scan", max_retries=None)
@@ -71,19 +93,17 @@ def run_scan(self, request: dict) -> dict:
     running scan, the task re-queues itself rather than running a second one.
     """
     req = ScanRequest(**request)
-    guard = RedisConcurrencyGuard()
+    result = asyncio.run(_acquire_run_release(req))
 
-    if not asyncio.run(guard.acquire(req.tenant_id, req.scan_id)):
+    if result is None:
         logger.info(
             '{"event": "scan_requeued_tenant_busy", "tenant": "%s", "scan": "%s"}',
-            req.tenant_id, req.scan_id,
+            req.tenant_id,
+            req.scan_id,
         )
         raise self.retry(countdown=SCAN_REQUEUE_DELAY)
 
-    try:
-        return asyncio.run(_run_and_persist(req))
-    finally:
-        asyncio.run(guard.release(req.tenant_id, req.scan_id))
+    return result
 
 
 __all__ = ["celery_app", "run_scan", "SCAN_REQUEUE_DELAY"]

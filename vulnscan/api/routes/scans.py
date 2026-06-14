@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vulnscan.api.auth import CurrentUser, require_roles
 from vulnscan.api.deps import EnqueueScan, get_db, get_enqueuer
+from vulnscan.api.reporting import build_report, render_html, render_markdown
 from vulnscan.api.repository import get_active_program, get_scoped, list_scoped, write_audit
-from vulnscan.api.schemas import ScanCreatedResponse, ScanCreateRequest
+from vulnscan.api.schemas import ScanCreatedResponse, ScanCreateRequest, ScanReport
 from vulnscan.domain.enums import ScanStatus, UserRole
 from vulnscan.domain.models import ScanFinding, ScanJob
 from vulnscan.domain.schemas import ScanFindingRead, ScanJobRead
@@ -67,8 +68,11 @@ async def create_scan(
         user_id=user.id,
         action="scan.created",
         target=body.target_url,
-        detail={"scan_id": str(job.id), "program_id": str(program.id),
-                "scan_level": body.scan_level},
+        detail={
+            "scan_id": str(job.id),
+            "program_id": str(program.id),
+            "scan_level": body.scan_level,
+        },
     )
     await session.commit()
 
@@ -115,14 +119,72 @@ async def get_scan_findings(
     job = await get_scoped(session, ScanJob, scan_id, user.tenant_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="scan not found")
+    return await _findings_for(session, scan_id, user.tenant_id)
+
+
+@router.get("/{scan_id}/report", response_model=ScanReport)
+async def get_scan_report(
+    scan_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(UserRole.HACKER, UserRole.ADMIN)),
+    session: AsyncSession = Depends(get_db),
+) -> ScanReport:
+    """Executive + technical report, assembled from the persisted findings (§4.6)."""
+    job, findings = await _job_and_findings(session, scan_id, user.tenant_id)
+    return build_report(job, findings)
+
+
+@router.get("/{scan_id}/report.md")
+async def get_scan_report_markdown(
+    scan_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(UserRole.HACKER, UserRole.ADMIN)),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """Downloadable Markdown report."""
+    job, findings = await _job_and_findings(session, scan_id, user.tenant_id)
+    body = render_markdown(build_report(job, findings))
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="report-{scan_id}.md"'},
+    )
+
+
+@router.get("/{scan_id}/report.html")
+async def get_scan_report_html(
+    scan_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(UserRole.HACKER, UserRole.ADMIN)),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """Downloadable self-contained HTML report."""
+    job, findings = await _job_and_findings(session, scan_id, user.tenant_id)
+    body = render_html(build_report(job, findings))
+    return Response(
+        content=body,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="report-{scan_id}.html"'},
+    )
+
+
+async def _findings_for(
+    session: AsyncSession, scan_id: uuid.UUID, tenant_id: uuid.UUID
+) -> list[ScanFinding]:
     stmt = (
         select(ScanFinding)
-        .where(ScanFinding.tenant_id == user.tenant_id)
+        .where(ScanFinding.tenant_id == tenant_id)
         .where(ScanFinding.scan_job_id == scan_id)
         .where(ScanFinding.deleted_at.is_(None))
         .order_by(ScanFinding.severity)
     )
     return list((await session.execute(stmt)).scalars().all())
+
+
+async def _job_and_findings(
+    session: AsyncSession, scan_id: uuid.UUID, tenant_id: uuid.UUID
+) -> tuple[ScanJob, list[ScanFinding]]:
+    job = await get_scoped(session, ScanJob, scan_id, tenant_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="scan not found")
+    return job, await _findings_for(session, scan_id, tenant_id)
 
 
 async def _previous_findings(
@@ -138,9 +200,7 @@ async def _previous_findings(
         .limit(50)
     )
     rows = (await session.execute(stmt)).all()
-    return [
-        {"title": t, "severity": s.value, "cvss_score": c} for (t, s, c) in rows
-    ]
+    return [{"title": t, "severity": s.value, "cvss_score": c} for (t, s, c) in rows]
 
 
 __all__ = ["router"]

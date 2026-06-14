@@ -16,7 +16,7 @@ from vulnscan.domain.schemas import FindingBase
 from vulnscan.scanners.base import ScanResult
 
 
-class BaseChain(ABC):
+class BaseChain(ABC):  # noqa: B024 - marker base; subclasses override hooks/attrs, not methods
     """One analysis chain == one finding category (CLAUDE.md §4.4)."""
 
     #: Short category id, used in the evidence label and logs.

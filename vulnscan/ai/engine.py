@@ -116,9 +116,7 @@ class AnalysisEngine:
         items = _parse_json_array(text)
         if items is None:
             # One repair attempt, then drop rather than ship garbage (§5.2).
-            logger.warning(
-                json.dumps({"engine": "analyze", "event": "json_parse_failed_retrying"})
-            )
+            logger.warning(json.dumps({"engine": "analyze", "event": "json_parse_failed_retrying"}))
             repaired = await self._complete(system, REPAIR_PROMPT + text)
             items = _parse_json_array(repaired)
             if items is None:
@@ -151,9 +149,7 @@ class AnalysisEngine:
         return _text_of(resp)
 
     @staticmethod
-    def _build_user_message(
-        evidence_label: str, evidence: Any, context: AnalysisContext
-    ) -> str:
+    def _build_user_message(evidence_label: str, evidence: Any, context: AnalysisContext) -> str:
         """Fold the §2.2 mandatory context around the raw evidence."""
         tech = ", ".join(context.tech_stack) if context.tech_stack else "unknown"
         prev = (

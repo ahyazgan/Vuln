@@ -59,9 +59,7 @@ def mock_client() -> Callable[[Callable[[httpx.Request], httpx.Response]], httpx
     clients: list[httpx.AsyncClient] = []
 
     def _make(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.AsyncClient:
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(handler), follow_redirects=True
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
         clients.append(client)
         return client
 

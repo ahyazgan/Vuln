@@ -63,19 +63,19 @@ async def get_current_user(
         claims = decode_token(credentials.credentials, expected_type="access")
     except TokenError as exc:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
     user = await _load_live_user(session, uuid.UUID(claims["sub"]))
     if user is None or str(user.tenant_id) != claims.get("tenant"):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="user no longer valid",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user no longer valid",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return CurrentUser(
-        id=user.id, tenant_id=user.tenant_id, email=user.email, role=user.role
-    )
+    return CurrentUser(id=user.id, tenant_id=user.tenant_id, email=user.email, role=user.role)
 
 
 def require_roles(*roles: UserRole):
@@ -93,7 +93,16 @@ def require_roles(*roles: UserRole):
 
 
 async def _load_live_user(session: AsyncSession, user_id: uuid.UUID) -> User | None:
-    stmt = select(User).where(User.id == user_id).where(User.deleted_at.is_(None))
+    # Reject users whose account OR whose tenant has been (soft-)deleted, so an
+    # admin suspending a tenant (sets Tenant.deleted_at) immediately blocks all
+    # of its users from authenticating or refreshing (CLAUDE.md §1 abuse control).
+    stmt = (
+        select(User)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .where(User.id == user_id)
+        .where(User.deleted_at.is_(None))
+        .where(Tenant.deleted_at.is_(None))
+    )
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
@@ -125,7 +134,14 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_db
 
 @router.post("/login", response_model=TokenPair)
 async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> TokenPair:
-    stmt = select(User).where(User.email == str(body.email)).where(User.deleted_at.is_(None))
+    # Join Tenant so a suspended (soft-deleted) tenant's users can't log in (§1).
+    stmt = (
+        select(User)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .where(User.email == str(body.email))
+        .where(User.deleted_at.is_(None))
+        .where(Tenant.deleted_at.is_(None))
+    )
     if body.tenant_id is not None:
         stmt = stmt.where(User.tenant_id == body.tenant_id)
     matches = list((await session.execute(stmt)).scalars().all())
@@ -139,9 +155,7 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> 
     # Verify even when the user is missing would leak timing; a constant-ish
     # failure path is acceptable here — reject with a generic message.
     if user is None or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return _issue_pair(user)
 
 
@@ -150,9 +164,7 @@ async def refresh(body: RefreshRequest, session: AsyncSession = Depends(get_db))
     try:
         claims = decode_token(body.refresh_token, expected_type="refresh")
     except TokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     user = await _load_live_user(session, uuid.UUID(claims["sub"]))
     if user is None:

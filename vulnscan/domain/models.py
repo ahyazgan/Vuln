@@ -42,7 +42,9 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from vulnscan.domain.encryption import EncryptedJSON, EncryptedString
 from vulnscan.domain.enums import (
+    PaymentStatus,
     PlanType,
     ScanStatus,
     Severity,
@@ -87,9 +89,7 @@ def _enum(enum_cls: type, name: str) -> SAEnum:
 class UUIDPrimaryKeyMixin:
     """Adds a client-generated UUID primary key."""
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
 class TimestampMixin:
@@ -149,9 +149,7 @@ class User(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
     """A platform user. Email is unique *within* a tenant."""
 
     __tablename__ = "users"
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "email", name="uq_users_tenant_email"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_users_tenant_email"),)
 
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -194,9 +192,7 @@ class ScanJob(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
 
     __tablename__ = "scan_jobs"
     __table_args__ = (
-        CheckConstraint(
-            "scan_level >= 1 AND scan_level <= 6", name="ck_scan_jobs_scan_level"
-        ),
+        CheckConstraint("scan_level >= 1 AND scan_level <= 6", name="ck_scan_jobs_scan_level"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -219,12 +215,8 @@ class ScanJob(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
         index=True,
     )
     scan_level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     program: Mapped["BountyProgram | None"] = relationship(back_populates="scan_jobs")
@@ -243,9 +235,7 @@ class ScanFinding(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
 
     __tablename__ = "scan_findings"
     __table_args__ = (
-        CheckConstraint(
-            "cvss_score >= 0 AND cvss_score <= 10", name="ck_scan_findings_cvss_range"
-        ),
+        CheckConstraint("cvss_score >= 0 AND cvss_score <= 10", name="ck_scan_findings_cvss_range"),
     )
 
     scan_job_id: Mapped[uuid.UUID] = mapped_column(
@@ -254,17 +244,21 @@ class ScanFinding(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    # Sensitive free-text content is encrypted at rest (§7.4): it reveals the
+    # vulnerability and how to exploit it. Stored as ciphertext Text columns.
+    title: Mapped[str] = mapped_column(EncryptedString, nullable=False)
+    # severity/cvss_score stay plaintext — the API sorts/aggregates on them and
+    # they carry no exploit detail.
     severity: Mapped[Severity] = mapped_column(
         _enum(Severity, "finding_severity"), nullable=False, index=True
     )
     cvss_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    proof_of_concept: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # JSON array of reference URLs/CVE ids. ("references" is a reserved SQL word;
-    # SQLAlchemy quotes it automatically in DDL.)
-    references: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    description: Mapped[str] = mapped_column(EncryptedString, nullable=False)
+    proof_of_concept: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    recommendation: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    # Encrypted JSON array of reference URLs/CVE ids. ("references" is a reserved
+    # SQL word; SQLAlchemy quotes it automatically in DDL.)
+    references: Mapped[list] = mapped_column(EncryptedJSON, nullable=False, default=list)
     is_chained: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # JSON array of parent finding ids (stored as strings) when is_chained is true.
     chain_parent_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -314,11 +308,47 @@ class BountySubmission(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, B
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    reviewed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     finding: Mapped["ScanFinding"] = relationship(back_populates="submissions")
+    payments: Mapped[list["Payment"]] = relationship(
+        back_populates="submission", cascade="all, delete-orphan"
+    )
+
+
+class Payment(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
+    """A bounty reward payment for an accepted submission (Stripe-backed).
+
+    ``tenant_id`` is the *paying company's* tenant (the one that owns the program
+    and reviews submissions), so every read filters by it (§2.6). Only payment
+    *metadata* is persisted — amount, currency, status, and the Stripe object id;
+    never card data, tokens, or any secret (§7.3 / §2.5). The Stripe API key
+    lives in the environment and is read by the gateway, never stored here.
+    """
+
+    __tablename__ = "payments"
+    __table_args__ = (CheckConstraint("amount >= 0", name="ck_payments_amount_non_negative"),)
+
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("bounty_submissions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="usd")
+    status: Mapped[PaymentStatus] = mapped_column(
+        _enum(PaymentStatus, "payment_status"),
+        nullable=False,
+        default=PaymentStatus.PENDING,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="stripe")
+    # The Stripe PaymentIntent id (e.g. "pi_..."). Indexed for webhook lookup.
+    provider_payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    submission: Mapped["BountySubmission"] = relationship(back_populates="payments")
 
 
 class AuditLog(UUIDPrimaryKeyMixin, TenantScopedMixin, Base):
@@ -356,5 +386,6 @@ __all__ = [
     "ScanJob",
     "ScanFinding",
     "BountySubmission",
+    "Payment",
     "AuditLog",
 ]

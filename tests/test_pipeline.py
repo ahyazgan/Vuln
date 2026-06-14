@@ -51,30 +51,41 @@ class FakeEngine:
         if schema is ChainedFinding:
             return [
                 ChainedFinding(
-                    title="Info leak enables injection", severity=Severity.HIGH,
-                    cvss_score=8.1, description="F1 + F2 combine.",
+                    title="Info leak enables injection",
+                    severity=Severity.HIGH,
+                    cvss_score=8.1,
+                    description="F1 + F2 combine.",
                     chain_parent_ids=["F1", "F2"],
                 )
             ]
         return [
             FindingBase(
-                title=f"finding from {evidence_label}", severity=Severity.LOW,
-                cvss_score=2.0, description="d",
+                title=f"finding from {evidence_label}",
+                severity=Severity.LOW,
+                cvss_score=2.0,
+                description="d",
             )
         ]
 
 
 def _results() -> dict:
     recon = ScanResult(
-        scanner="recon", target=TARGET,
+        scanner="recon",
+        target=TARGET,
         data={
             "tech_stack": ["nginx", "WordPress"],
             "scripts": ["https://example.com/app.js"],
             "forms": [
-                {"action": "https://example.com/login", "method": "post",
-                 "inputs": [{"name": "u", "type": "text"}, {"name": "p", "type": "password"}]},
-                {"action": "https://example.com/search", "method": "get",
-                 "inputs": [{"name": "q", "type": "text"}]},
+                {
+                    "action": "https://example.com/login",
+                    "method": "post",
+                    "inputs": [{"name": "u", "type": "text"}, {"name": "p", "type": "password"}],
+                },
+                {
+                    "action": "https://example.com/search",
+                    "method": "get",
+                    "inputs": [{"name": "q", "type": "text"}],
+                },
             ],
             "links": {
                 "internal": ["https://example.com/admin", "https://example.com/about"],
@@ -92,8 +103,11 @@ def _results() -> dict:
 
 def _request(level: int) -> ScanRequest:
     return ScanRequest(
-        scan_id="scan-1", tenant_id="tenant-1", target_url=TARGET,
-        scope_domains=["example.com"], scan_level=level,
+        scan_id="scan-1",
+        tenant_id="tenant-1",
+        target_url=TARGET,
+        scope_domains=["example.com"],
+        scan_level=level,
     )
 
 
@@ -109,8 +123,8 @@ async def test_full_pipeline_level_6():
 
     assert result.completed_step == 6
     assert result.tech_stack == ["nginx", "WordPress"]
-    assert len(result.findings) == 3            # header + js + xss
-    assert len(result.chained_findings) == 1    # F1+F2 chain survives
+    assert len(result.findings) == 3  # header + js + xss
+    assert len(result.chained_findings) == 1  # F1+F2 chain survives
     assert result.report["total_findings"] == 4
     assert result.report["max_severity"] == "high"
 
@@ -121,8 +135,14 @@ async def test_full_pipeline_level_6():
     # Every step persisted intermediate state keyed by scan_id (§4).
     keys = set((await state.all("scan-1")).keys())
     assert keys == {
-        "recon", "surface", "active_http", "active_js", "active_fuzz",
-        "findings", "chained_findings", "report",
+        "recon",
+        "surface",
+        "active_http",
+        "active_js",
+        "active_fuzz",
+        "findings",
+        "chained_findings",
+        "report",
     }
 
 
@@ -147,16 +167,14 @@ async def test_scan_level_3_active_no_analysis():
         _request(3), scanner_factory=factory, engine=FakeEngine(), state=state
     )
     assert result.completed_step == 3
-    assert result.findings == []        # analysis (step 4) not reached
+    assert result.findings == []  # analysis (step 4) not reached
     assert "active_fuzz" in await state.all("scan-1")
 
 
 async def test_surface_mapping_prioritizes_risky():
     factory = FakeScannerFactory(_results())
     state = InMemoryScanStateStore()
-    await ScanPipeline().run(
-        _request(2), scanner_factory=factory, engine=FakeEngine(), state=state
-    )
+    await ScanPipeline().run(_request(2), scanner_factory=factory, engine=FakeEngine(), state=state)
     surface = await state.get("scan-1", "surface")
     # Login (password input) ranks before the plain search form.
     assert surface["priority_forms"][0]["action"].endswith("/login")

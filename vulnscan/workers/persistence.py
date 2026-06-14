@@ -14,9 +14,8 @@ cross-reference once persisted.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from vulnscan.ai.chains import ChainedFinding
 from vulnscan.domain.enums import ScanStatus
 from vulnscan.domain.models import ScanFinding, ScanJob
 from vulnscan.workers.pipeline import PipelineResult, ScanRequest
@@ -57,9 +56,7 @@ async def persist_scan_result(session, request: ScanRequest, result: PipelineRes
 
     # 2. Chained findings — resolve local parent ids to real UUIDs.
     for c in result.chained_findings:
-        parent_uuids = [
-            str(id_map[pid].id) for pid in c.chain_parent_ids if pid in id_map
-        ]
+        parent_uuids = [str(id_map[pid].id) for pid in c.chain_parent_ids if pid in id_map]
         row = ScanFinding(
             tenant_id=tenant_id,
             scan_job_id=scan_job_id,
@@ -80,7 +77,7 @@ async def persist_scan_result(session, request: ScanRequest, result: PipelineRes
     job = await session.get(ScanJob, scan_job_id)
     if job is not None:
         job.status = ScanStatus.COMPLETED
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
 
     await session.commit()
     return {

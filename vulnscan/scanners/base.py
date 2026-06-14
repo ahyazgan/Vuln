@@ -28,7 +28,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -193,7 +193,7 @@ class BaseScanner(ABC):
         self._owns_client = client is None
 
     # -- lifecycle --------------------------------------------------------- #
-    async def __aenter__(self) -> "BaseScanner":
+    async def __aenter__(self) -> BaseScanner:
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
@@ -260,7 +260,7 @@ class BaseScanner(ABC):
             "scanner": self.name,
             "step": step,
             "target": self.target_url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             **fields,
         }
         logger.log(level, json.dumps(record, default=str))
@@ -279,7 +279,7 @@ class BaseScanner(ABC):
         event) and returned as an errored result; any other exception is
         logged at ERROR and likewise returned as an errored result.
         """
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         self._log("start")
         try:
             result = await self.run()
@@ -294,7 +294,7 @@ class BaseScanner(ABC):
             if result.started_at is None:
                 result.started_at = started
             if result.finished_at is None:
-                result.finished_at = datetime.now(timezone.utc)
+                result.finished_at = datetime.now(UTC)
             if result.duration_ms is None:
                 result.duration_ms = (
                     result.finished_at - result.started_at
@@ -303,7 +303,7 @@ class BaseScanner(ABC):
         return result
 
     def _error_result(self, started: datetime, message: str) -> ScanResult:
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         return ScanResult(
             scanner=self.name,
             target=self.target_url,

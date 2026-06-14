@@ -4,7 +4,7 @@ Run against an in-memory SQLite database (see conftest.py).
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -181,7 +181,7 @@ async def test_submission_dual_tenant_and_money(session):
     finding = await make_finding(session, hacker_tenant, job)
 
     sub = BountySubmission(
-        tenant_id=hacker_tenant.id,          # submitter side
+        tenant_id=hacker_tenant.id,  # submitter side
         company_tenant_id=company_tenant.id,  # reviewer side
         finding_id=finding.id,
         hacker_user_id=hacker.id,
@@ -212,15 +212,23 @@ async def test_tenant_isolation_filters_by_tenant_id(session):
     await session.commit()
 
     t1_users = (
-        await session.execute(
-            select(User).where(User.tenant_id == t1.id, User.deleted_at.is_(None))
+        (
+            await session.execute(
+                select(User).where(User.tenant_id == t1.id, User.deleted_at.is_(None))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     t2_users = (
-        await session.execute(
-            select(User).where(User.tenant_id == t2.id, User.deleted_at.is_(None))
+        (
+            await session.execute(
+                select(User).where(User.tenant_id == t2.id, User.deleted_at.is_(None))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assert {u.email for u in t1_users} == {"a@one.com"}
     assert {u.email for u in t2_users} == {"b@two.com", "c@two.com"}
@@ -242,10 +250,10 @@ async def test_findings_do_not_leak_across_tenants(session):
     await session.commit()
 
     rows = (
-        await session.execute(
-            select(ScanFinding).where(ScanFinding.tenant_id == t1.id)
-        )
-    ).scalars().all()
+        (await session.execute(select(ScanFinding).where(ScanFinding.tenant_id == t1.id)))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].severity is Severity.CRITICAL
     assert rows[0].tenant_id == t1.id
@@ -281,22 +289,24 @@ async def test_soft_delete_excludes_row_from_active_query(session):
     user = await make_user(session, tenant)
     await session.commit()
 
-    user.deleted_at = datetime.now(timezone.utc)
+    user.deleted_at = datetime.now(UTC)
     await session.commit()
 
     active = (
-        await session.execute(
-            select(User).where(
-                User.tenant_id == tenant.id, User.deleted_at.is_(None)
+        (
+            await session.execute(
+                select(User).where(User.tenant_id == tenant.id, User.deleted_at.is_(None))
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert active == []
 
     # The row still physically exists (soft delete, not hard delete).
     all_rows = (
-        await session.execute(select(User).where(User.tenant_id == tenant.id))
-    ).scalars().all()
+        (await session.execute(select(User).where(User.tenant_id == tenant.id))).scalars().all()
+    )
     assert len(all_rows) == 1
     assert all_rows[0].deleted_at is not None
 

@@ -44,10 +44,7 @@ class ChainAnalysisChain:
             return []
 
         # Assign each individual finding a stable id the model can reference.
-        indexed = [
-            {"id": f"F{i + 1}", **f.model_dump(mode="json")}
-            for i, f in enumerate(findings)
-        ]
+        indexed = [{"id": f"F{i + 1}", **f.model_dump(mode="json")} for i, f in enumerate(findings)]
         known_ids = {item["id"] for item in indexed}
 
         chained = await engine.analyze(

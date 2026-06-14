@@ -60,7 +60,7 @@ async def test_weak_hsts_and_bad_nosniff_flagged(mock_client):
             200,
             headers={
                 "strict-transport-security": "max-age=100",  # far below 6 months
-                "x-content-type-options": "sniff",            # not 'nosniff'
+                "x-content-type-options": "sniff",  # not 'nosniff'
             },
         )
 

@@ -67,8 +67,7 @@ async def test_register_rejects_admin(api):
     client, _, _ = api
     r = await client.post(
         f"{P}/auth/register",
-        json={"email": "a@x.com", "password": "password123", "role": "admin",
-              "tenant_name": "X"},
+        json={"email": "a@x.com", "password": "password123", "role": "admin", "tenant_name": "X"},
     )
     assert r.status_code == 403
 
@@ -85,9 +84,7 @@ async def test_protected_route_requires_token(api):
 async def test_bad_login_rejected(api):
     client, _, _ = api
     await _register(client, "h@acme.com", "hacker", "Acme")
-    r = await client.post(
-        f"{P}/auth/login", json={"email": "h@acme.com", "password": "wrongpass"}
-    )
+    r = await client.post(f"{P}/auth/login", json={"email": "h@acme.com", "password": "wrongpass"})
     assert r.status_code == 401
 
 
@@ -98,7 +95,8 @@ async def test_hacker_cannot_create_program(api):
     client, _, _ = api
     hacker = await _register(client, "h@acme.com", "hacker", "Acme")
     r = await client.post(
-        f"{P}/programs", headers=_auth(hacker),
+        f"{P}/programs",
+        headers=_auth(hacker),
         json={"name": "P", "scope_domains": ["x.com"]},
     )
     assert r.status_code == 403
@@ -125,9 +123,13 @@ async def test_scan_in_scope_enqueues_and_returns_job_id(api):
     hacker = await _register(client, "h@hx.com", "hacker", "HackerOrg")
 
     r = await client.post(
-        f"{P}/scans", headers=_auth(hacker),
-        json={"target_url": "https://example.com/login", "program_id": program["id"],
-              "scan_level": 4},
+        f"{P}/scans",
+        headers=_auth(hacker),
+        json={
+            "target_url": "https://example.com/login",
+            "program_id": program["id"],
+            "scan_level": 4,
+        },
     )
     assert r.status_code == 202, r.text
     body = r.json()
@@ -148,7 +150,8 @@ async def test_scan_out_of_scope_refused_and_not_enqueued(api):
     hacker = await _register(client, "h@hx.com", "hacker", "HackerOrg")
 
     r = await client.post(
-        f"{P}/scans", headers=_auth(hacker),
+        f"{P}/scans",
+        headers=_auth(hacker),
         json={"target_url": "https://evil.com/", "program_id": program["id"]},
     )
     assert r.status_code == 422
@@ -159,7 +162,8 @@ async def test_scan_unknown_program_404(api):
     client, enqueued, _ = api
     hacker = await _register(client, "h@hx.com", "hacker", "HackerOrg")
     r = await client.post(
-        f"{P}/scans", headers=_auth(hacker),
+        f"{P}/scans",
+        headers=_auth(hacker),
         json={"target_url": "https://example.com/", "program_id": str(uuid.uuid4())},
     )
     assert r.status_code == 404
@@ -172,14 +176,21 @@ async def test_scan_unknown_program_404(api):
 async def _seed_finding(maker, tenant_id, user_id) -> uuid.UUID:
     async with maker() as s:
         job = ScanJob(
-            tenant_id=tenant_id, user_id=user_id,
-            target_url="https://example.com/", status=ScanStatus.COMPLETED, scan_level=6,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            target_url="https://example.com/",
+            status=ScanStatus.COMPLETED,
+            scan_level=6,
         )
         s.add(job)
         await s.flush()
         finding = ScanFinding(
-            tenant_id=tenant_id, scan_job_id=job.id, title="XSS",
-            severity=Severity.HIGH, cvss_score=7.5, description="reflected xss",
+            tenant_id=tenant_id,
+            scan_job_id=job.id,
+            title="XSS",
+            severity=Severity.HIGH,
+            cvss_score=7.5,
+            description="reflected xss",
         )
         s.add(finding)
         await s.commit()
@@ -199,7 +210,8 @@ async def test_submission_lifecycle(api):
 
     # Hacker submits the finding to the company.
     r = await client.post(
-        f"{P}/submissions", headers=_auth(hacker),
+        f"{P}/submissions",
+        headers=_auth(hacker),
         json={"finding_id": str(finding_id), "company_tenant_id": company_me["tenant_id"]},
     )
     assert r.status_code == 201, r.text
@@ -212,7 +224,8 @@ async def test_submission_lifecycle(api):
 
     # Company accepts with a reward.
     review = await client.post(
-        f"{P}/submissions/{submission_id}/review", headers=_auth(company),
+        f"{P}/submissions/{submission_id}/review",
+        headers=_auth(company),
         json={"status": "accepted", "reward_amount": "750.00"},
     )
     assert review.status_code == 200
@@ -221,7 +234,8 @@ async def test_submission_lifecycle(api):
     # A different company cannot review it.
     other = await _register(client, "o@o.com", "company", "Other")
     forbidden = await client.post(
-        f"{P}/submissions/{submission_id}/review", headers=_auth(other),
+        f"{P}/submissions/{submission_id}/review",
+        headers=_auth(other),
         json={"status": "rejected"},
     )
     assert forbidden.status_code == 404
@@ -234,13 +248,15 @@ async def test_webhook_signature_verified(api):
     client, _, _ = api
     body = b'{"event":"scan.completed"}'
     good = await client.post(
-        f"{P}/webhooks/inbound", content=body,
+        f"{P}/webhooks/inbound",
+        content=body,
         headers={"X-VulnScan-Signature": sign(body), "Content-Type": "application/json"},
     )
     assert good.status_code == 204
 
     bad = await client.post(
-        f"{P}/webhooks/inbound", content=body,
+        f"{P}/webhooks/inbound",
+        content=body,
         headers={"X-VulnScan-Signature": "deadbeef"},
     )
     assert bad.status_code == 401

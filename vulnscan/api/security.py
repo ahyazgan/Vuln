@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -46,7 +46,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def _encode(
     *, user_id: uuid.UUID, tenant_id: uuid.UUID, role: str, token_type: str, ttl: timedelta
 ) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "tenant": str(tenant_id),
@@ -60,15 +60,21 @@ def _encode(
 
 def create_access_token(*, user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
     return _encode(
-        user_id=user_id, tenant_id=tenant_id, role=role,
-        token_type="access", ttl=ACCESS_TOKEN_TTL,
+        user_id=user_id,
+        tenant_id=tenant_id,
+        role=role,
+        token_type="access",
+        ttl=ACCESS_TOKEN_TTL,
     )
 
 
 def create_refresh_token(*, user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
     return _encode(
-        user_id=user_id, tenant_id=tenant_id, role=role,
-        token_type="refresh", ttl=REFRESH_TOKEN_TTL,
+        user_id=user_id,
+        tenant_id=tenant_id,
+        role=role,
+        token_type="refresh",
+        ttl=REFRESH_TOKEN_TTL,
     )
 
 

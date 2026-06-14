@@ -79,9 +79,7 @@ class TestBaseScannerRequest:
             called["n"] += 1
             return httpx.Response(200, text="should not happen")
 
-        scanner = _ProbeScanner(
-            "https://evil.com/", ["example.com"], client=mock_client(handler)
-        )
+        scanner = _ProbeScanner("https://evil.com/", ["example.com"], client=mock_client(handler))
         with pytest.raises(ScopeViolationError):
             await scanner._get("https://evil.com/")
         assert called["n"] == 0  # no socket opened for an out-of-scope URL
@@ -143,9 +141,7 @@ class TestSafeRun:
             return httpx.Response(200)
 
         # Target is out of scope -> run() raises ScopeViolationError -> caught.
-        scanner = _ProbeScanner(
-            "https://evil.com/", ["example.com"], client=mock_client(handler)
-        )
+        scanner = _ProbeScanner("https://evil.com/", ["example.com"], client=mock_client(handler))
         result = await scanner.safe_run()
         assert result.error and not result.success
         assert "scope violation" in result.error_message

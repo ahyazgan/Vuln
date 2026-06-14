@@ -46,7 +46,8 @@ def _finding(title, severity="low", cvss=3.0):
 async def test_header_chain_forwards_evidence_and_prompt():
     engine = _RecordingEngine([_finding("Missing HSTS", "high", 6.5)])
     result = ScanResult(
-        scanner="http_headers", target="https://example.com",
+        scanner="http_headers",
+        target="https://example.com",
         data={"missing": [{"header": "Strict-Transport-Security"}]},
     )
     findings = await HeaderAnalysisChain().analyze(result, _ctx(), engine)
@@ -61,8 +62,11 @@ async def test_header_chain_forwards_evidence_and_prompt():
 async def test_errored_scan_short_circuits_without_calling_engine():
     engine = _RecordingEngine([_finding("should not appear")])
     result = ScanResult(
-        scanner="http_headers", target="https://example.com",
-        success=False, error=True, error_message="boom",
+        scanner="http_headers",
+        target="https://example.com",
+        success=False,
+        error=True,
+        error_message="boom",
     )
     findings = await HeaderAnalysisChain().analyze(result, _ctx(), engine)
     assert findings == []
@@ -121,13 +125,16 @@ async def test_chain_analysis_builds_chained_finding(fake_anthropic):
 async def test_chain_analysis_filters_unknown_ids_and_weak_chains(fake_anthropic):
     # References F1 (valid) + F9 (unknown) -> only one real parent -> dropped.
     weak = {
-        "severity": "medium", "title": "weak", "description": "d",
-        "cvss_score": 5.0, "proof_of_concept": "p", "recommendation": "r",
-        "references": [], "chain_parent_ids": ["F1", "F9"],
+        "severity": "medium",
+        "title": "weak",
+        "description": "d",
+        "cvss_score": 5.0,
+        "proof_of_concept": "p",
+        "recommendation": "r",
+        "references": [],
+        "chain_parent_ids": ["F1", "F9"],
     }
     client = fake_anthropic([json.dumps([weak])])
     engine = AnalysisEngine(client=client)
-    out = await ChainAnalysisChain().analyze(
-        [_finding("a"), _finding("b")], _ctx(), engine
-    )
+    out = await ChainAnalysisChain().analyze([_finding("a"), _finding("b")], _ctx(), engine)
     assert out == []  # F9 filtered out, leaving <2 real parents -> not a chain

@@ -124,8 +124,9 @@ class JsSecretScanner(BaseScanner):
 
     async def _discover_scripts(self) -> list[str]:
         """Fetch the target and pull absolute <script src> URLs (recon-lite)."""
-        from vulnscan.scanners.recon import _SurfaceParser  # local import avoids cycle
         from urllib.parse import urldefrag, urljoin
+
+        from vulnscan.scanners.recon import _SurfaceParser  # local import avoids cycle
 
         resp = await self._get(self.target_url)
         parser = _SurfaceParser()

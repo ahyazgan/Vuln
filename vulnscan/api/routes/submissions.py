@@ -10,7 +10,7 @@ transition only — no payment processor is wired here.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -51,10 +51,15 @@ async def create_submission(
     session.add(submission)
     await session.flush()
     write_audit(
-        session, tenant_id=user.tenant_id, user_id=user.id,
-        action="submission.created", target=str(finding.id),
-        detail={"submission_id": str(submission.id),
-                "company_tenant_id": str(body.company_tenant_id)},
+        session,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="submission.created",
+        target=str(finding.id),
+        detail={
+            "submission_id": str(submission.id),
+            "company_tenant_id": str(body.company_tenant_id),
+        },
     )
     await session.commit()
     await session.refresh(submission)
@@ -90,13 +95,18 @@ async def review_submission(
 
     submission.status = body.status
     submission.reward_amount = body.reward_amount
-    submission.reviewed_at = datetime.now(timezone.utc)
+    submission.reviewed_at = datetime.now(UTC)
     write_audit(
-        session, tenant_id=user.tenant_id, user_id=user.id,
-        action="submission.reviewed", target=str(submission.id),
-        detail={"status": body.status.value,
-                "reward_amount": str(body.reward_amount) if body.reward_amount else None,
-                "reason": body.reason},
+        session,
+        tenant_id=user.tenant_id,
+        user_id=user.id,
+        action="submission.reviewed",
+        target=str(submission.id),
+        detail={
+            "status": body.status.value,
+            "reward_amount": str(body.reward_amount) if body.reward_amount else None,
+            "reason": body.reason,
+        },
     )
     await session.commit()
     await session.refresh(submission)

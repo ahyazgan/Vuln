@@ -63,19 +63,19 @@ async def get_current_user(
         claims = decode_token(credentials.credentials, expected_type="access")
     except TokenError as exc:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
     user = await _load_live_user(session, uuid.UUID(claims["sub"]))
     if user is None or str(user.tenant_id) != claims.get("tenant"):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="user no longer valid",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user no longer valid",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return CurrentUser(
-        id=user.id, tenant_id=user.tenant_id, email=user.email, role=user.role
-    )
+    return CurrentUser(id=user.id, tenant_id=user.tenant_id, email=user.email, role=user.role)
 
 
 def require_roles(*roles: UserRole):
@@ -139,9 +139,7 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> 
     # Verify even when the user is missing would leak timing; a constant-ish
     # failure path is acceptable here — reject with a generic message.
     if user is None or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return _issue_pair(user)
 
 
@@ -150,9 +148,7 @@ async def refresh(body: RefreshRequest, session: AsyncSession = Depends(get_db))
     try:
         claims = decode_token(body.refresh_token, expected_type="refresh")
     except TokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     user = await _load_live_user(session, uuid.UUID(claims["sub"]))
     if user is None:

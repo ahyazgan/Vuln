@@ -121,7 +121,7 @@ def _detect_tech(headers: dict[str, str], html: str, scripts: list[str]) -> list
         for needle, label in sigs:
             if needle in value:
                 found.add(label)
-    haystack = (html.lower() + " " + " ".join(scripts).lower())
+    haystack = html.lower() + " " + " ".join(scripts).lower()
     for needle, label in _MARKUP_SIGNATURES:
         if needle in haystack:
             found.add(label)

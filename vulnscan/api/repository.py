@@ -36,9 +36,7 @@ async def get_scoped(
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
-async def list_scoped(
-    session: AsyncSession, model: type[T], tenant_id: uuid.UUID
-) -> list[T]:
+async def list_scoped(session: AsyncSession, model: type[T], tenant_id: uuid.UUID) -> list[T]:
     """List all live rows of ``model`` for ``tenant_id`` (newest first)."""
     stmt = (
         select(model)
@@ -49,9 +47,7 @@ async def list_scoped(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def get_active_program(
-    session: AsyncSession, program_id: uuid.UUID
-) -> BountyProgram | None:
+async def get_active_program(session: AsyncSession, program_id: uuid.UUID) -> BountyProgram | None:
     """Read a published, active program by id — cross-tenant by design.
 
     Programs define public scope that hackers from other tenants test against,

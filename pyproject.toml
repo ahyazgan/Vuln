@@ -34,6 +34,13 @@ dashboard = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
 ]
+# One-shot developer environment: runtime deps (from [project.dependencies]) plus
+# the test suite and lint/format tooling. `pip install -e ".[dev]"` is all a
+# contributor — or CI — needs to run the full check suite.
+dev = [
+    "vulnscan[test,dashboard]",
+    "ruff>=0.5",
+]
 
 [tool.setuptools.packages.find]
 include = ["vulnscan*"]
@@ -45,3 +52,20 @@ testpaths = ["tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["alembic/versions", "vulnscan/frontend"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, flake8-bugbear.
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",   # line length is enforced by the formatter, not the linter
+    "B008",   # FastAPI's `Depends()`-in-defaults is the framework's idiom
+    "UP042",  # `str, Enum` base is deliberate (portable value semantics, §domain)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vulnscan"]

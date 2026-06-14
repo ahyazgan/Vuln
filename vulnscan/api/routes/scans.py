@@ -67,8 +67,11 @@ async def create_scan(
         user_id=user.id,
         action="scan.created",
         target=body.target_url,
-        detail={"scan_id": str(job.id), "program_id": str(program.id),
-                "scan_level": body.scan_level},
+        detail={
+            "scan_id": str(job.id),
+            "program_id": str(program.id),
+            "scan_level": body.scan_level,
+        },
     )
     await session.commit()
 
@@ -138,9 +141,7 @@ async def _previous_findings(
         .limit(50)
     )
     rows = (await session.execute(stmt)).all()
-    return [
-        {"title": t, "severity": s.value, "cvss_score": c} for (t, s, c) in rows
-    ]
+    return [{"title": t, "severity": s.value, "cvss_score": c} for (t, s, c) in rows]
 
 
 __all__ = ["router"]

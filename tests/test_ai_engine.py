@@ -29,7 +29,9 @@ def _ctx() -> AnalysisContext:
 async def test_parses_findings_from_clean_json(fake_anthropic):
     engine = AnalysisEngine(client=fake_anthropic([json.dumps([_FINDING])]))
     findings = await engine.analyze(
-        system="focus", evidence_label="Raw headers", evidence={"missing": ["hsts"]},
+        system="focus",
+        evidence_label="Raw headers",
+        evidence={"missing": ["hsts"]},
         context=_ctx(),
     )
     assert len(findings) == 1
@@ -77,8 +79,8 @@ async def test_unrecoverable_json_is_dropped(fake_anthropic):
 
 
 async def test_invalid_finding_item_skipped_valid_kept(fake_anthropic):
-    bad = {**_FINDING, "severity": "extreme"}        # not a valid Severity
-    worse = {**_FINDING, "cvss_score": 99}           # out of 0..10 range
+    bad = {**_FINDING, "severity": "extreme"}  # not a valid Severity
+    worse = {**_FINDING, "cvss_score": 99}  # out of 0..10 range
     engine = AnalysisEngine(client=fake_anthropic([json.dumps([_FINDING, bad, worse])]))
     findings = await engine.analyze(
         system="focus", evidence_label="Raw headers", evidence={}, context=_ctx()
@@ -106,10 +108,10 @@ async def test_call_includes_mandatory_context_and_cached_base_prompt(fake_anthr
     # User message carries the §2.2 mandatory context + raw evidence.
     user = call["messages"][0]["content"]
     assert "Target URL: https://example.com" in user
-    assert "nginx, PHP" in user                      # tech stack
-    assert "Old finding" in user                      # previous findings
+    assert "nginx, PHP" in user  # tech stack
+    assert "Old finding" in user  # previous findings
     assert "Raw headers scan output" in user
-    assert "hsts" in user                             # raw evidence echoed
+    assert "hsts" in user  # raw evidence echoed
 
     # Model id is the constitution-pinned analysis model (§5.6).
     assert call["model"] == engine.model

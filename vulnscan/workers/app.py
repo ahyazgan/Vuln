@@ -37,7 +37,7 @@ SCAN_REQUEUE_DELAY = int(os.getenv("VULNSCAN_SCAN_RETRY_SECONDS", "30"))
 
 celery_app = Celery("vulnscan", broker=BROKER_URL, backend=RESULT_BACKEND)
 celery_app.conf.update(
-    task_acks_late=True,           # re-deliver if a worker dies mid-scan
+    task_acks_late=True,  # re-deliver if a worker dies mid-scan
     worker_prefetch_multiplier=1,  # one long scan at a time per worker process
     task_track_started=True,
     task_serializer="json",
@@ -76,7 +76,8 @@ def run_scan(self, request: dict) -> dict:
     if not asyncio.run(guard.acquire(req.tenant_id, req.scan_id)):
         logger.info(
             '{"event": "scan_requeued_tenant_busy", "tenant": "%s", "scan": "%s"}',
-            req.tenant_id, req.scan_id,
+            req.tenant_id,
+            req.scan_id,
         )
         raise self.retry(countdown=SCAN_REQUEUE_DELAY)
 

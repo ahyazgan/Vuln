@@ -44,8 +44,20 @@ from vulnscan.scanners.recon import ReconScanner
 
 # Endpoint/form substrings that flag a higher-value active-testing target (§4.2).
 _RISKY_KEYWORDS = (
-    "admin", "login", "signin", "sign-in", "auth", "upload", "account",
-    "password", "passwd", "config", "setup", "dashboard", "checkout", "payment",
+    "admin",
+    "login",
+    "signin",
+    "sign-in",
+    "auth",
+    "upload",
+    "account",
+    "password",
+    "passwd",
+    "config",
+    "setup",
+    "dashboard",
+    "checkout",
+    "payment",
 )
 
 
@@ -117,7 +129,10 @@ class ScannerFactory:
 
     def js_secrets(self, target: str, script_urls: list[str]) -> JsSecretScanner:
         return JsSecretScanner(
-            target, self.scope, client=self._http(), scan_id=self.scan_id,
+            target,
+            self.scope,
+            client=self._http(),
+            scan_id=self.scan_id,
             script_urls=script_urls,
         )
 
@@ -184,7 +199,9 @@ class ScanPipeline:
             await state.set(sid, "surface", surface)
             summaries.append(
                 {
-                    "step": 2, "name": "surface_mapping", "status": "ok",
+                    "step": 2,
+                    "name": "surface_mapping",
+                    "status": "ok",
                     "result_summary": (
                         f"{len(surface['priority_forms'])} forms prioritized, "
                         f"{len(surface['risky_endpoints'])} risky endpoints"
@@ -211,24 +228,28 @@ class ScanPipeline:
             findings += await self.header_chain.analyze(http_res, context, engine)
             findings += await self.js_chain.analyze(js_res, context, engine)
             findings += await self.xss_chain.analyze(fuzz_res, context, engine)
-            await state.set(
-                sid, "findings", [f.model_dump(mode="json") for f in findings]
-            )
+            await state.set(sid, "findings", [f.model_dump(mode="json") for f in findings])
             summaries.append(
-                {"step": 4, "name": "claude_analysis", "status": "ok",
-                 "result_summary": f"{len(findings)} individual findings"}
+                {
+                    "step": 4,
+                    "name": "claude_analysis",
+                    "status": "ok",
+                    "result_summary": f"{len(findings)} individual findings",
+                }
             )
             completed = 4
 
         # --- Step 5: Chain analysis ---------------------------------------- #
         if level >= 5:
             chained = await self.chain_analysis.analyze(findings, context, engine)
-            await state.set(
-                sid, "chained_findings", [c.model_dump(mode="json") for c in chained]
-            )
+            await state.set(sid, "chained_findings", [c.model_dump(mode="json") for c in chained])
             summaries.append(
-                {"step": 5, "name": "chain_analysis", "status": "ok",
-                 "result_summary": f"{len(chained)} attack chains"}
+                {
+                    "step": 5,
+                    "name": "chain_analysis",
+                    "status": "ok",
+                    "result_summary": f"{len(chained)} attack chains",
+                }
             )
             completed = 5
 
@@ -238,15 +259,25 @@ class ScanPipeline:
             report = _build_report(request, findings, chained)
             await state.set(sid, "report", report)
             summaries.append(
-                {"step": 6, "name": "report", "status": "ok",
-                 "result_summary": f"max_severity={report['max_severity']}"}
+                {
+                    "step": 6,
+                    "name": "report",
+                    "status": "ok",
+                    "result_summary": f"max_severity={report['max_severity']}",
+                }
             )
             completed = 6
 
         return PipelineResult(
-            scan_id=sid, target_url=target, scan_level=level, completed_step=completed,
-            tech_stack=tech, findings=findings, chained_findings=chained,
-            report=report, step_summaries=summaries,
+            scan_id=sid,
+            target_url=target,
+            scan_level=level,
+            completed_step=completed,
+            tech_stack=tech,
+            findings=findings,
+            chained_findings=chained,
+            report=report,
+            step_summaries=summaries,
         )
 
 
@@ -256,7 +287,9 @@ class ScanPipeline:
 def _summary(step: int, name: str, *results: ScanResult) -> dict:
     status = "ok" if all(not r.error for r in results) else "partial"
     return {
-        "step": step, "name": name, "status": status,
+        "step": step,
+        "name": name,
+        "status": status,
         "result_summary": "; ".join(r.summary() for r in results),
     }
 
@@ -292,9 +325,7 @@ def _build_report(
     by_severity = {sev.value: 0 for sev in Severity}
     for f in all_findings:
         by_severity[f.severity.value] += 1
-    max_severity = max(
-        (f.severity for f in all_findings), key=lambda s: s.rank, default=None
-    )
+    max_severity = max((f.severity for f in all_findings), key=lambda s: s.rank, default=None)
     return {
         "scan_id": request.scan_id,
         "target_url": request.target_url,

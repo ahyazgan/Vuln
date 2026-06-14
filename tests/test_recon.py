@@ -41,9 +41,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
 
 
 async def test_recon_extracts_surface(mock_client):
-    scanner = ReconScanner(
-        "https://example.com/", ["example.com"], client=mock_client(_handler)
-    )
+    scanner = ReconScanner("https://example.com/", ["example.com"], client=mock_client(_handler))
     result = await scanner.run()
     data = result.data
 
@@ -59,9 +57,7 @@ async def test_recon_extracts_surface(mock_client):
 
 
 async def test_recon_parses_forms(mock_client):
-    scanner = ReconScanner(
-        "https://example.com/", ["example.com"], client=mock_client(_handler)
-    )
+    scanner = ReconScanner("https://example.com/", ["example.com"], client=mock_client(_handler))
     result = await scanner.run()
     forms = result.data["forms"]
 
@@ -76,16 +72,14 @@ async def test_recon_parses_forms(mock_client):
 
 
 async def test_recon_detects_tech_and_scripts(mock_client):
-    scanner = ReconScanner(
-        "https://example.com/", ["example.com"], client=mock_client(_handler)
-    )
+    scanner = ReconScanner("https://example.com/", ["example.com"], client=mock_client(_handler))
     result = await scanner.run()
     data = result.data
 
-    assert "WordPress" in data["tech_stack"]   # from <meta generator> markup
-    assert "nginx" in data["tech_stack"]        # from Server header
-    assert "PHP" in data["tech_stack"]          # from X-Powered-By
-    assert "jQuery" in data["tech_stack"]       # from script src
+    assert "WordPress" in data["tech_stack"]  # from <meta generator> markup
+    assert "nginx" in data["tech_stack"]  # from Server header
+    assert "PHP" in data["tech_stack"]  # from X-Powered-By
+    assert "jQuery" in data["tech_stack"]  # from script src
     # Scripts resolved to absolute URLs.
     assert "https://example.com/static/app.js" in data["scripts"]
     assert "https://cdn.example.com/jquery.min.js" in data["scripts"]

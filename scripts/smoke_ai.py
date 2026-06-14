@@ -21,13 +21,20 @@ async def main() -> None:
 
     # Realistic HttpHeaderScanner output for a site missing key controls.
     evidence = ScanResult(
-        scanner="http_headers", target="https://example.com/",
+        scanner="http_headers",
+        target="https://example.com/",
         data={
             "status_code": 200,
             "present": [],
             "missing": [
-                {"header": "Content-Security-Policy", "note": "No CSP; injected scripts unrestricted."},
-                {"header": "Strict-Transport-Security", "note": "HSTS not set; downgradeable to HTTP."},
+                {
+                    "header": "Content-Security-Policy",
+                    "note": "No CSP; injected scripts unrestricted.",
+                },
+                {
+                    "header": "Strict-Transport-Security",
+                    "note": "HSTS not set; downgradeable to HTTP.",
+                },
                 {"header": "X-Frame-Options", "note": "Clickjacking protection not set."},
                 {"header": "X-Content-Type-Options", "note": "MIME sniffing not disabled."},
             ],
@@ -52,8 +59,10 @@ async def main() -> None:
         chained = await ChainAnalysisChain().analyze(findings, ctx, engine)
         print(f"{len(chained)} attack chain(s):")
         for c in chained:
-            print(f"  [{c.severity.value.upper():8}] CVSS {c.cvss_score:<4} {c.title}  "
-                  f"(combines {c.chain_parent_ids})")
+            print(
+                f"  [{c.severity.value.upper():8}] CVSS {c.cvss_score:<4} {c.title}  "
+                f"(combines {c.chain_parent_ids})"
+            )
 
     print("\nLIVE AI TEST DONE")
 

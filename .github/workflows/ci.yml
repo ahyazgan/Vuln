@@ -30,8 +30,8 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          ruff check vulnscan tests
-          ruff format --check vulnscan tests
+          ruff check vulnscan tests scripts
+          ruff format --check vulnscan tests scripts
 
       - name: Tests (pytest)
         run: pytest -q

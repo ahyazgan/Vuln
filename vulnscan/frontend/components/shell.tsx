@@ -21,6 +21,7 @@ const NAV: NavItem[] = [
   { href: "/programs", label: "Programs", roles: ["company", "admin"] },
   { href: "/submissions", label: "Submissions", roles: ["hacker", "company"] },
   { href: "/payments", label: "Payments", roles: ["company", "admin"] },
+  { href: "/admin", label: "Admin", roles: ["admin"] },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {

@@ -15,6 +15,7 @@ from contextlib import AbstractAsyncContextManager
 from fastapi import FastAPI
 
 from vulnscan.api.auth import router as auth_router
+from vulnscan.api.routes.admin import router as admin_router
 from vulnscan.api.routes.payments import router as payments_router
 from vulnscan.api.routes.programs import router as programs_router
 from vulnscan.api.routes.scans import router as scans_router
@@ -46,6 +47,7 @@ def create_app(*, lifespan: Lifespan | None = None) -> FastAPI:
         scans_router,
         submissions_router,
         payments_router,
+        admin_router,
         webhooks_router,
     ):
         app.include_router(router, prefix=API_PREFIX)

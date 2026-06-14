@@ -121,3 +121,35 @@ export interface ScanReport {
   findings: ScanFinding[];
   chained_findings: ScanFinding[];
 }
+
+export type PlanType = "starter" | "pro" | "enterprise";
+
+export interface AdminStats {
+  tenants: number;
+  users: number;
+  programs: number;
+  scans: number;
+  findings: number;
+  submissions: number;
+  payments: number;
+}
+
+export interface TenantAdmin {
+  id: string;
+  name: string;
+  plan: PlanType;
+  created_at: string;
+  deleted_at: string | null;
+  user_count: number;
+  scan_count: number;
+}
+
+export interface AuditLog {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  action: string;
+  target: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
+}

@@ -6,15 +6,19 @@
 
 import type {
   AccessToken,
+  AdminStats,
+  AuditLog,
   BountyProgram,
   BountySubmission,
   Payment,
   PaymentInitiated,
+  PlanType,
   ScanCreated,
   ScanFinding,
   ScanJob,
   ScanReport,
   SubmissionStatus,
+  TenantAdmin,
   TokenPair,
   User,
   UserRole,
@@ -142,6 +146,22 @@ export const api = {
       body,
       token,
     }),
+
+  // --- Admin (platform management) -------------------------------------------
+  adminStats: (token: string) => request<AdminStats>("/admin/stats", { token }),
+
+  adminTenants: (token: string) => request<TenantAdmin[]>("/admin/tenants", { token }),
+
+  adminUpdateTenant: (
+    token: string,
+    tenantId: string,
+    body: { plan?: PlanType; name?: string },
+  ) => request<TenantAdmin>(`/admin/tenants/${tenantId}`, { method: "PATCH", body, token }),
+
+  adminSuspendTenant: (token: string, tenantId: string) =>
+    request<TenantAdmin>(`/admin/tenants/${tenantId}`, { method: "DELETE", token }),
+
+  adminAudit: (token: string) => request<AuditLog[]>("/admin/audit", { token }),
 };
 
 /**

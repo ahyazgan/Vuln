@@ -46,9 +46,9 @@ constraints.
 
 The backend is feature-complete and tested: domain layer, scanners, AI engine,
 the six-step Celery worker pipeline, the HTTP API (auth, programs, scans,
-submissions, append-only audit log), and Stripe-backed bounty **payments**. A
-Next.js 14 **frontend** (`vulnscan/frontend/`) covers auth, scans, programs,
-submissions, and payments.
+submissions, append-only audit log), Stripe-backed bounty **payments**, and
+**encryption of findings at rest** (§7.4). A Next.js 14 **frontend**
+(`vulnscan/frontend/`) covers auth, scans, programs, submissions, and payments.
 
 ### Developing
 

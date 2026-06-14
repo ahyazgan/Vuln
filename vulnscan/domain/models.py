@@ -42,6 +42,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from vulnscan.domain.encryption import EncryptedJSON, EncryptedString
 from vulnscan.domain.enums import (
     PaymentStatus,
     PlanType,
@@ -243,17 +244,21 @@ class ScanFinding(UUIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    # Sensitive free-text content is encrypted at rest (§7.4): it reveals the
+    # vulnerability and how to exploit it. Stored as ciphertext Text columns.
+    title: Mapped[str] = mapped_column(EncryptedString, nullable=False)
+    # severity/cvss_score stay plaintext — the API sorts/aggregates on them and
+    # they carry no exploit detail.
     severity: Mapped[Severity] = mapped_column(
         _enum(Severity, "finding_severity"), nullable=False, index=True
     )
     cvss_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    proof_of_concept: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # JSON array of reference URLs/CVE ids. ("references" is a reserved SQL word;
-    # SQLAlchemy quotes it automatically in DDL.)
-    references: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    description: Mapped[str] = mapped_column(EncryptedString, nullable=False)
+    proof_of_concept: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    recommendation: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
+    # Encrypted JSON array of reference URLs/CVE ids. ("references" is a reserved
+    # SQL word; SQLAlchemy quotes it automatically in DDL.)
+    references: Mapped[list] = mapped_column(EncryptedJSON, nullable=False, default=list)
     is_chained: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # JSON array of parent finding ids (stored as strings) when is_chained is true.
     chain_parent_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
